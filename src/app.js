@@ -59,9 +59,9 @@ app.post("/flips", (req, res, next) => {
     result,
     };
     flips.push(newFlip);
-    counts[result] = counts[result] +1;
-  } else { 
     res.status(201).json({ data: newFlip });
+  } else { 
+    res.sendStatus(400);
   }
 });
 
