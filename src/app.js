@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const flips = require("./data/flips-data");
 const counts = require("./data/counts-data");
+const res = require("express/lib/response");
 
 app.use(express.json());
 
@@ -12,7 +13,7 @@ app.use(
     const foundCount = counts[countId];
 
     if(foundCount === undefined) {
-      next(`Count id not found: ${countId}`);
+      next({status: 404, message: `Count id not found: ${countId}`});
     } else {
       res.json({ data: foundCount });
     }
@@ -35,7 +36,7 @@ app.use(
     if(foundFlip){
       res.json({ data: foundFlip });
     } else {
-      next(`Flip id not found ${flipId}`);
+      next({status: 404, message: `Flip id not found ${flipId}`});
     }
   }
 );
@@ -47,23 +48,36 @@ app.get(
   }
 );
 
+//Ne middleware function to validate the request body
+function bodyHasResultProperty(req, res, next){
+  const { data: { result } = {} } = req.body;
+  if(result){
+    return next(); // Call next() without an error message if the result exists
+  }
+  next({
+    status: 400,
+    message: "A 'result' property is required."
+  });
+} 
+
 //Variable to hold next ID
 //Because some IDs may already be used, find the largest assigned ID
 let lastFlipId = flips.reduce((maxId, flip) => Math.max(maxId, flip.id), 0);
 
-app.post("/flips", (req, res, next) => {
-  const { data: { result } = {} } = req.body;
-  if(result) {
+app.post(
+  "/flips",
+  bodyHasResultProperty, // Add validation middleware function
+  (req, res) => {
+    // Route handler no longer has validation code.
+    const { data: { result } = {} } = req.body;
     const newFlip = {
-    id: ++lastFlipId, //increment last ID, then assign as the currentID
-    result,
+      id: ++lastFlipId, //increment last ID, then assign as the currentID
+      result,
     };
     flips.push(newFlip);
     res.status(201).json({ data: newFlip });
-  } else { 
-    res.sendStatus(400);
   }
-});
+);
 
 // Not found handler
 app.use((request, response, next) => {
@@ -73,7 +87,8 @@ app.use((request, response, next) => {
 // Error handler
 app.use((error, request, response, next) => {
   console.error(error);
-  response.send(error);
+  const { status = 500, message = "Something went wrong!" } = error;
+  res.status(status).json({ error: message });
 });
 
 module.exports = app;
